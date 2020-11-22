@@ -540,7 +540,7 @@ def result_ins_box_mask(img,
         # rect_x=[]
         # rect_y=[]
         # vis_pos = (max(int(center_x) - 10, 0), int(center_y))
-        img_show = cv2.rectangle(img_show, (box[0],box[1]), (box[2],box[3]), (0,255,0), 2)
+        # img_show = cv2.rectangle(img_show, (box[0],box[1]), (box[2],box[3]), (0,255,0), 2)
         # img_show = cv2.rectangle(img_show, (x1,y1), (x2,y2), (0,255,0), 2)
         # cv2.putText(img_show, label_text, vis_pos,
         #                 cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255))  # green
@@ -564,4 +564,4 @@ def result_ins_box_mask(img,
             y = 0 
         box = [x,y,bw,bh]
         return_boxs_mask.append([box,box_img,box_mask_bin])
-    return return_boxs_mask
+    return return_boxs_mask,img_show
