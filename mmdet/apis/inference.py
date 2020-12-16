@@ -210,6 +210,8 @@ def show_result_pyplot(img,
     plt.figure(figsize=fig_size)
     plt.imshow(mmcv.bgr2rgb(img))
 
+def get_box_cuda(cur_mask):
+    pass
 
 def get_box(mask):
     # if x_c < 0 or y_c < 0 or x_c == mask.shape[1] or y_c == mask.shape[0] or mask[x_c][y_c] != 1:
@@ -305,6 +307,12 @@ def show_result_ins(img,
         label_text = class_names[cur_cate]
         #label_text += '|{:.02f}'.format(cur_score)
         center_y, center_x = ndimage.measurements.center_of_mass(cur_mask)
+        # sum_x = np.sum(cur_mask, axis=0)
+        # x = np.where(sum_x > 0.5)[0]
+        # sum_y = np.sum(cur_mask, axis=1)
+        # y = np.where(sum_y > 0.5)[0]
+        # x0, x1, y0, y1 = x[0], x[-1], y[0], y[-1]
+        # img_show = cv2.rectangle(img_show, (x0,y0), (x1,y1), (0,255,0), 2)
         vis_pos = (max(int(center_x) - 10, 0), int(center_y))
         cv2.putText(img_show, label_text, vis_pos,
                         cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255))  # green
@@ -467,45 +475,65 @@ def result_ins_box_mask(img,
 
     cur_result = result[0]
     seg_label = cur_result[0]
-    seg_label = seg_label.cpu().numpy().astype(np.uint8)
-    cate_label = cur_result[1]
-    cate_label = cate_label.cpu().numpy()
-    score = cur_result[2].cpu().numpy()
-
-    vis_inds = score > score_thr
+    # print(type(seg_label))
+    # print(len(seg_label))
+    # print(len(seg_label[0]))
+    # print(len(seg_label[0][0]))
+    # print(cur_result[1])
+    cate_t = torch.where(cur_result[1] == 0)
+    # print(cur_result[2][cate_t])
+    vis_inds = torch.where(cur_result[2][cate_t] > score_thr)
     seg_label = seg_label[vis_inds]
+    prev_time_f = time.time()
+    seg_label = seg_label.cpu().numpy().astype(np.uint8)
+    logger.info('front process frame time:'+str(time.time()-prev_time_f))
     num_mask = seg_label.shape[0]
-    cate_label = cate_label[vis_inds]
-    cate_score = score[vis_inds]
+    # cate_label = cur_result[1]
+    # cate_label = cate_label.cpu().numpy()
+    # score = cur_result[2].cpu().numpy()
+    
 
-    person_inds = cate_label == 0
-    seg_label = seg_label[person_inds]
-    num_mask = seg_label.shape[0]
-    cate_label = cate_label[person_inds]
-    cate_score = cate_score[person_inds]
-
-    if sort_by_density:
-        mask_density = []
-        for idx in range(num_mask):
-            cur_mask = seg_label[idx, :, :]
-            cur_mask = mmcv.imresize(cur_mask, (w, h))
-            cur_mask = (cur_mask > 0.5).astype(np.int32)
-            mask_density.append(cur_mask.sum())
-        orders = np.argsort(mask_density)
-        seg_label = seg_label[orders]
-        cate_label = cate_label[orders]
-        cate_score = cate_score[orders]
-
+    # vis_inds = score > score_thr
+    # seg_label = seg_label[vis_inds]
+    # num_mask = seg_label.shape[0]
+    # cate_label = cate_label[vis_inds]
+    # cate_score = score[vis_inds]
+    
+    # person_inds = cate_label == 0
+    # seg_label = seg_label[person_inds]
+    # num_mask = seg_label.shape[0]
+    # cate_label = cate_label[person_inds]
+    # cate_score = cate_score[person_inds]
+    
+    # if sort_by_density:
+    #     mask_density = []
+    #     for idx in range(num_mask):
+    #         cur_mask = seg_label[idx, :, :]
+    #         cur_mask = mmcv.imresize(cur_mask, (w, h))
+    #         cur_mask = (cur_mask > 0.5).astype(np.int32)
+    #         mask_density.append(cur_mask.sum())
+    #     orders = np.argsort(mask_density)
+    #     seg_label = seg_label[orders]
+    #     cate_label = cate_label[orders]
+    #     cate_score = cate_score[orders]
+    
     np.random.seed(42)
     color_masks = [
         np.random.randint(0, 256, (1, 3), dtype=np.uint8)
         for _ in range(num_mask)
     ]
+    # prev_time_f = time.time()
+    # seg_label = seg_label.cpu().numpy().astype(np.uint8)
+    # logger.info('front process frame time:'+str(time.time()-prev_time_f))
     return_boxs_mask = []
+    prev_time_p = time.time()
     for idx in range(num_mask):
+        prev_time = time.time()
         idx = -(idx+1)
         cur_mask = seg_label[idx, :, :]
         cur_mask = mmcv.imresize(cur_mask, (w, h))
+        logger.info('imresize process frame time:'+str(time.time()-prev_time))
+        prev_time = time.time()
         cur_mask = (cur_mask > 0.5).astype(np.uint8)
         if cur_mask.sum() == 0:
             continue
@@ -513,40 +541,31 @@ def result_ins_box_mask(img,
         cur_mask_bool = cur_mask.astype(np.bool)
         img_show[cur_mask_bool] = img[cur_mask_bool] * 0.5 + color_mask * 0.5
 
-        cur_cate = cate_label[idx]
-        cur_score = cate_score[idx]
-        label_text = class_names[cur_cate]
+        # cur_cate = cate_label[idx]
+        # cur_score = cate_score[idx]
+        # label_text = class_names[cur_cate]
+        logger.info('cur_mask_bool process frame time:'+str(time.time()-prev_time))
         #label_text += '|{:.02f}'.format(cur_score)
         # center_y, center_x = ndimage.measurements.center_of_mass(cur_mask)
-        # prev_time = time.time()
-        py,px = ndimage.measurements.find_objects(cur_mask)[0]
-        box = [px.start,py.start,px.stop,py.stop]
-        # print(py)
-        # print(px)
-        # print(px.start)
-        # print(px.stop)
-        # logger.info('ndimage process frame time:'+str(time.time()-prev_time))
-        # global rect_x
-        # global rect_y
-        # mmcv.imwrite(cur_mask, 'cur_mask.jpg')
-        # get_box_cuda(cur_mask)
-        # prev_time = time.time()
-        # box = get_box(cur_mask)
-        # logger.info('process frame time:'+str(time.time()-prev_time))
-        # x1 = min(rect_x)
-        # y1 = min(rect_y)
-        # x2 = max(rect_x)
-        # y2 = max(rect_y)
-        # rect_x=[]
-        # rect_y=[]
-        # vis_pos = (max(int(center_x) - 10, 0), int(center_y))
-        # img_show = cv2.rectangle(img_show, (box[0],box[1]), (box[2],box[3]), (0,255,0), 2)
-        # img_show = cv2.rectangle(img_show, (x1,y1), (x2,y2), (0,255,0), 2)
-        # cv2.putText(img_show, label_text, vis_pos,
-        #                 cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255))  # green
-        # mmcv.imwrite(img_show, out_file)
-        box_mask = cur_mask[py.start:py.stop,px.start:px.stop]
-        box_img = img[py.start:py.stop,px.start:px.stop]
+        prev_time = time.time()
+        # sum_x = np.sum(cur_mask, axis=0)
+        # x = np.where(sum_x > 0.5)[0]
+        # sum_y = np.sum(cur_mask, axis=1)
+        # y = np.where(sum_y > 0.5)[0]
+        cur_mask_tensor = torch.from_numpy(cur_mask)
+        sum_x = torch.sum(cur_mask_tensor, dim=0)
+        x = torch.where(sum_x > 0.5)[0]
+        sum_y = torch.sum(cur_mask_tensor, dim=1)
+        y = torch.where(sum_y > 0.5)[0]
+        x0, x1, y0, y1 = x[0], x[-1], y[0], y[-1]
+        # py,px = ndimage.measurements.find_objects(cur_mask)[0]
+        # box = [px.start,py.start,px.stop,py.stop]
+        # box_mask = cur_mask[py.start:py.stop,px.start:px.stop]
+        # box_img = img[py.start:py.stop,px.start:px.stop]
+        logger.info('torch process frame time:'+str(time.time()-prev_time))
+        box = [x0,y0,x1,y1]
+        box_mask = cur_mask[y0:y1,x0:x1]
+        box_img = img[y0:y1,x0:x1]
         ret,box_mask_bin = cv2.threshold(box_mask,0,255,cv2.THRESH_BINARY)
         # mmcv.imwrite(box_mask, 'box_mask.jpg')
         # mmcv.imwrite(box_img, 'box_img.jpg')
@@ -564,4 +583,6 @@ def result_ins_box_mask(img,
             y = 0 
         box = [x,y,bw,bh]
         return_boxs_mask.append([box,box_img,box_mask_bin])
+        # mmcv.imwrite(img_show, out_file)
+    logger.info('np process frame time:'+str(time.time()-prev_time_p))
     return return_boxs_mask,img_show

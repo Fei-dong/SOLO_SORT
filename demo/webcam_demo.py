@@ -67,7 +67,7 @@ def main():
     w = int(camera.get(3))
     h = int(camera.get(4))
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    out = cv2.VideoWriter('output.avi', fourcc, 15, (w, h))
+    out = cv2.VideoWriter('MOT16-01-solo-out-03.avi', fourcc, 15, (w, h))
         # list_file = open('detection.txt', 'w')
         # frame_index = -1 
 
@@ -83,7 +83,7 @@ def main():
         demo_path = './results/' + str(count) + '.jpg'
         # if ret_val:
         prev_time = time.time()
-        boxs_masks,img_show = result_ins_box_mask(img, result, model.CLASSES, score_thr=0.25, out_file=demo_path)
+        boxs_masks,img_show = result_ins_box_mask(img, result, model.CLASSES, score_thr=0.3, out_file=demo_path) #0.25
         boxs_masks = np.array(boxs_masks)
         logger.info('postprocessing frame time:'+str(time.time()-prev_time))
         features = encoder(boxs_masks[:,1:])

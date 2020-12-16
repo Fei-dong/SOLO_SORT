@@ -18,7 +18,7 @@ model = init_detector(config_file, checkpoint_file, device='cuda:0')
 
 # test a single image
 # img = 'demo.jpg'
-img = '000000.png'
+img = 'input.jpg'
 prev_time = time.time()
 result = inference_detector(model, img)
 logger.info('process frame time:'+str(time.time()-prev_time))
